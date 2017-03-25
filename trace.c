@@ -49,6 +49,7 @@ void trace(struct in_addr *dst, int send_cnt) {
     struct icmphdr icmp_hdr;
     struct sockaddr_in addr;
     struct icmphdr rcv_hdr;
+    //struct in_addr holdaddr;
 
     //define structures for timeout information
     struct timeval timeout = {5, 0};
@@ -58,6 +59,7 @@ void trace(struct in_addr *dst, int send_cnt) {
 
     //various variables
     unsigned char data[2048]; // Packet data
+    char *oldip; //hold the value of previous IP address
     int ch;
     int count = 0;
     int on = 1;
@@ -188,9 +190,28 @@ void trace(struct in_addr *dst, int send_cnt) {
             }
             count = 0;
 
-            //Convert the sender address information to a readable format then print
+            struct hostent *he;
+	    //Convert the sender address information to a readable format then print
             inet_ntop(AF_INET, &(address.sin_addr),ip4, INET_ADDRSTRLEN);
-            printf("Address: %s Hops: %d\n", ip4, hops);
+            he = gethostbyaddr(&(address.sin_addr), sizeof(address.sin_addr), AF_INET);
+
+	    /*if(oldip == NULL) {
+		printf("old ip NULL\n");
+		oldip = ip4;
+	    }
+	    else if(strcmp(oldip,ip4) == 0) {
+		printf("old: %s new: %s\n", oldip, ip4);
+		continue;
+	    } else {
+		oldip = ip4;
+	    }
+
+	    printf("past the if\n");*/
+
+	    if(he != NULL)
+		printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hops);
+	    else
+		printf("Address: %s Hops: %d\n", ip4, hops);
 
             //Convert and compare the address of the destination with the address of the sender
             //if the sender == the destination than the process ends and the socket is closed.
