@@ -41,6 +41,14 @@ uint16_t chk_sum(void *buffer, int len) {
     return result;
 }
 
+int starr_print(char strarray[100][INET_ADDRSTRLEN], int arrsize) {
+    int i;
+
+    for(i = 0;i < arrsize-1; i++) {
+        printf("Address %d: %s\n", i, strarray[i]);
+    }
+}
+
 //This function does all the heavy lifting
 //It takes the argument dst which is a structure containing the
 //destination information, and performs a traceroute against it.
@@ -60,6 +68,7 @@ void trace(struct in_addr *dst, int send_cnt) {
     //various variables
     unsigned char data[2048]; // Packet data
     char oldip[INET_ADDRSTRLEN]; //hold the value of previous IP address
+    char iparray[100][INET_ADDRSTRLEN];
     int ch;
     int count = 0;
     int on = 1;
@@ -201,19 +210,6 @@ void trace(struct in_addr *dst, int send_cnt) {
 		//printf("old ip: %s hops: %d\n", oldip, hops);
 		continue;
 	    }
-	    /*if(oldip == NULL) {
-		printf("old ip NULL\n");
-		oldip = ip4;
-	    }
-	    else if(strcmp(oldip,ip4) == 0) {
-		printf("old: %s new: %s\n", oldip, ip4);
-		continue;
-	    } else {
-		oldip = ip4;
-	    }
-
-	    printf("past the if\n");*/
-
 	    if(he != NULL)
 		printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hops);
 	    else
@@ -229,11 +225,13 @@ void trace(struct in_addr *dst, int send_cnt) {
             //increment the TTL along with number of hops
             //(this represents the same thing, but was getting weird results when printing ttl)
             strncpy(oldip, ip4, sizeof(oldip));
+	    strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
 	    ttl++;
             hops++;
             continue;
         }
     }
+    starr_print(iparray, hops);
     //Close that socket when we are all done!
     close(sock);
 }
