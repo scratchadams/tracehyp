@@ -59,7 +59,7 @@ void trace(struct in_addr *dst, int send_cnt) {
 
     //various variables
     unsigned char data[2048]; // Packet data
-    char *oldip; //hold the value of previous IP address
+    char oldip[INET_ADDRSTRLEN]; //hold the value of previous IP address
     int ch;
     int count = 0;
     int on = 1;
@@ -96,7 +96,7 @@ void trace(struct in_addr *dst, int send_cnt) {
 
     for (;;) {
         //printf("Start loop\n");
-        usleep(120000);
+        //usleep(120000);
 
         //sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
         //This option sets the TTL value on the packet
@@ -173,6 +173,7 @@ void trace(struct in_addr *dst, int send_cnt) {
                            (struct sockaddr*)&address, &slen)) <= 0)
             {
                 if(count > 5) {
+		    strncpy(oldip, ip4, sizeof(oldip));;
                     count = 0;
                     ttl++;
                     hops++;
@@ -194,7 +195,12 @@ void trace(struct in_addr *dst, int send_cnt) {
 	    //Convert the sender address information to a readable format then print
             inet_ntop(AF_INET, &(address.sin_addr),ip4, INET_ADDRSTRLEN);
             he = gethostbyaddr(&(address.sin_addr), sizeof(address.sin_addr), AF_INET);
-
+	    
+	    if(strncmp(oldip, ip4, sizeof(oldip)) == 0) {
+		//printf("new ip: %s\n", ip4);
+		//printf("old ip: %s hops: %d\n", oldip, hops);
+		continue;
+	    }
 	    /*if(oldip == NULL) {
 		printf("old ip NULL\n");
 		oldip = ip4;
@@ -222,7 +228,8 @@ void trace(struct in_addr *dst, int send_cnt) {
 
             //increment the TTL along with number of hops
             //(this represents the same thing, but was getting weird results when printing ttl)
-            ttl++;
+            strncpy(oldip, ip4, sizeof(oldip));
+	    ttl++;
             hops++;
             continue;
         }
