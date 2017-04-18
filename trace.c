@@ -26,8 +26,8 @@ typedef struct {
 void *probe_thread(void *ip_info) {
     ip_struct address_info = *((ip_struct*)(ip_info));
 
-    probe_hop(address_info.ip_address, address_info.ttl);
-    //free(address_info);
+    if((strlen(address_info.ip_address)) > 3)
+	probe_hop(address_info.ip_address, address_info.ttl);
 }
     
 //This function will probe the individual hop and return the number of 
@@ -40,16 +40,19 @@ int probe_hop(char ip_address[INET_ADDRSTRLEN], int ttl) {
 //This function will handle the creation of new threads in order to gather
 //information from each individual hop, as well as the
 int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
-    int i;
+    pthread_t threads[ARRSIZE];
+    int i, rc;
     ip_struct *addr_info;
 
     for(i = 0;i < listsize-1; i++ ) {
 	strncpy(addr_info->ip_address, ip_list[i], INET_ADDRSTRLEN);
 	addr_info->ttl = i+1;
 	
-	printf("test: %s\n", addr_info->ip_address);
-	probe_thread(addr_info);
+	rc = pthread_create(&threads[i], NULL, probe_thread, addr_info);
+	pthread_join(threads[i], NULL);
+	    
     }
+    //free(addr_info);
 
     return 0;
 }
@@ -284,12 +287,7 @@ void trace(struct in_addr *dst, int send_cnt) {
         }
     }
     //starr_print(new_iparray, iparray, hops);
-    handle_hops(iparray, hops-1);
-    /*int j;
-    for(j = 0; j < hops+1; j++) {
-	printf("Test: %s\n", iparray[j]);
-    }*/
-    //Close that socket when we are all done!
+    handle_hops(iparray, hops);
     close(sock);
 }
 
