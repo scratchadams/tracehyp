@@ -11,10 +11,48 @@
 #include <arpa/inet.h>
 #include <sys/select.h>
 #include <fcntl.h>
+#include <pthread.h>
+
+#define ARRSIZE 100
 
 //to allow root to use icmp run:
 //sysctl -w net.ipv4.ping_group_range="0 0"
 
+typedef struct {
+    char ip_address[INET_ADDRSTRLEN];
+    int ttl;
+} ip_struct;
+
+void *probe_thread(void *ip_info) {
+    ip_struct address_info = *((ip_struct*)(ip_info));
+
+    probe_hop(address_info.ip_address, address_info.ttl);
+    //free(address_info);
+}
+    
+//This function will probe the individual hop and return the number of 
+//milliseconds it takes in order to receive the response from the hop
+int probe_hop(char ip_address[INET_ADDRSTRLEN], int ttl) {
+    printf("probing: %s with TTL: %d\n", ip_address, ttl);
+    return 0;
+}
+
+//This function will handle the creation of new threads in order to gather
+//information from each individual hop, as well as the
+int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
+    int i;
+    ip_struct *addr_info;
+
+    for(i = 0;i < listsize-1; i++ ) {
+	strncpy(addr_info->ip_address, ip_list[i], INET_ADDRSTRLEN);
+	addr_info->ttl = i+1;
+	
+	printf("test: %s\n", addr_info->ip_address);
+	probe_thread(addr_info);
+    }
+
+    return 0;
+}
 
 //This function calculates the ICMP checksum, based off of the ICMP header and it's data
 //the len value should be set to sizeof(icmp_header) + (length of ICMP data) to account for
@@ -41,12 +79,22 @@ uint16_t chk_sum(void *buffer, int len) {
     return result;
 }
 
-int starr_print(char strarray[100][INET_ADDRSTRLEN], int arrsize) {
+int starr_print(char *newarray[], char strarray[ARRSIZE][INET_ADDRSTRLEN], int arrsize) {
     int i;
+    int a = 0;
 
-    for(i = 0;i < arrsize-1; i++) {
-        printf("Address %d: %s\n", i, strarray[i]);
+    for(i = 0;i < arrsize; i++) {
+	if(strlen(strarray[i]) > 5) {
+	    printf("%s added\n", strarray[i]);
+	    newarray[a] = strarray[i];
+	    a++;
+	} else {
+	    printf("%s not added at %u length\n", strarray[i], (unsigned)strlen(strarray[i]));
+	}
+        //printf("Address %d: %s size: %u\n", i, strarray[i], (unsigned)strlen(strarray[i]));
     }
+    
+    return 0;
 }
 
 //This function does all the heavy lifting
@@ -68,7 +116,9 @@ void trace(struct in_addr *dst, int send_cnt) {
     //various variables
     unsigned char data[2048]; // Packet data
     char oldip[INET_ADDRSTRLEN]; //hold the value of previous IP address
-    char iparray[100][INET_ADDRSTRLEN];
+    char iparray[ARRSIZE][INET_ADDRSTRLEN];
+    char *new_iparray[ARRSIZE];
+
     int ch;
     int count = 0;
     int on = 1;
@@ -182,7 +232,8 @@ void trace(struct in_addr *dst, int send_cnt) {
                            (struct sockaddr*)&address, &slen)) <= 0)
             {
                 if(count > 5) {
-		    strncpy(oldip, ip4, sizeof(oldip));;
+		    strncpy(oldip, ip4, sizeof(oldip));
+		    //strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
                     count = 0;
                     ttl++;
                     hops++;
@@ -219,6 +270,7 @@ void trace(struct in_addr *dst, int send_cnt) {
             //if the sender == the destination than the process ends and the socket is closed.
             inet_ntop(AF_INET, &(addr.sin_addr), ip_compare, INET_ADDRSTRLEN);
             if(strcmp(ip4,ip_compare) == 0) {
+		strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
                 break;
             }
 
@@ -231,7 +283,12 @@ void trace(struct in_addr *dst, int send_cnt) {
             continue;
         }
     }
-    starr_print(iparray, hops);
+    //starr_print(new_iparray, iparray, hops);
+    handle_hops(iparray, hops-1);
+    /*int j;
+    for(j = 0; j < hops+1; j++) {
+	printf("Test: %s\n", iparray[j]);
+    }*/
     //Close that socket when we are all done!
     close(sock);
 }
