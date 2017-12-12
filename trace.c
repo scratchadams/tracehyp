@@ -291,6 +291,127 @@ void trace(struct in_addr *dst, int send_cnt) {
     close(sock);
 }
 
+void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
+	struct icmphdr icmp_hdr;
+	struct sockaddr_in addr;
+	struct icmphdr rcv_hdr;
+
+	struct timeval timeout = {5, 0};
+	struct timeval tv;
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+
+	unsigned char data[2048];
+	char iparray[ARRSIZE][INET_ADDRSTRLEN];
+
+	int ch;
+	int count, sequence = 0;
+	int on, hops = 1;
+    int ttl = hopnum;
+
+	fd_set read_set;
+	socklen_t slen;
+
+	int sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+	if (sock < 0) {
+		perror("socket");
+		return;
+	}
+
+	setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_addr = *dst;
+	addr.sin_port = 0;
+
+	memset(&icmp_hdr, 0, sizeof(icmp_hdr));
+	icmp_hdr.type = ICMP_ECHO;
+	icmp_hdr.checksum = 0;
+	icmp_hdr.un.echo.id = 1191; //make this random
+
+	for (;;) {
+
+        if((setsockopt(sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl))) < 0) {
+		    perror("setsockopt");
+		    break;
+	    }
+
+	    if((setsockopt(sock, IPPROTO_IP, IP_RECVERR, &on, sizeof(on))) < 0) {
+		    perror("setsockopt");
+		    break;
+	    }
+	    if((setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) < 0 ) {
+		    perror("setsockopt");
+		    break;
+	    }
+
+	    struct sockaddr_in address;
+	    char ip4[INET_ADDRSTRLEN];
+	    char ip_compare[INET_ADDRSTRLEN];
+
+	    memcpy(data, &icmp_hdr, sizeof(icmp_hdr));
+	    memcpy(data + sizeof(icmp_hdr), "hello", 5);
+
+	    int i;
+	    icmp_hdr.checksum = 0;
+
+	    icmp_hdr.checksum = chk_sum(data, sizeof(icmp_hdr)+5);
+	    memcpy(data, &icmp_hdr, sizeof(icmp_hdr));
+
+        if((ch = sendto(sock, data, sizeof(icmp_hdr) + 5,
+                0, (struct sockaddr*)&addr, sizeof(addr))) <= 0)
+        {
+            perror("sendto");
+            break;
+        }
+
+        memset(&read_set, 0, sizeof(read_set));
+        FD_ZERO(&read_set);
+        FD_SET(sock, &read_set);
+
+        ch = select(sock+1, &read_set, NULL, NULL, &timeout);
+
+        if(ch == 0) {
+            printf("timeout\n");
+            break;
+
+        } else if (ch < 0) {
+            perror("select");
+            break;
+
+        } else {
+            
+            slen = INET_ADDRSTRLEN;
+            if((ch = recvfrom(sock, data, sizeof(data), 0,
+                            (struct sockaddr*)&address, &slen)) <= 0)
+            {
+                if(count > 5) {
+                    printf("Nothing\n");
+                    break;
+                }
+                count++;
+                continue;
+            } else if (ch < sizeof(rcv_hdr)) {
+                printf("Error, got short ICMP packet, %d bytes\n", ch);
+                break;
+            }
+            count = 0;
+
+            struct hostent *he;
+
+            inet_ntop(AF_INET, &(address.sin_addr), ip4, INET_ADDRSTRLEN);
+            he = gethostbyaddr(&(address.sin_addr), sizeof(address.sin_addr), AF_INET);
+
+            if(he != NULL)
+                printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hopnum);
+            else
+                printf("Address: %s Hops: %d\n", ip4, hops);
+
+        }
+    }
+    close(sock);
+}
 int main(int argc, char *argv[]) {
     if(argc < 2) {
         printf("usage: %s destination_ip\n", argv[0]);
@@ -315,7 +436,8 @@ int main(int argc, char *argv[]) {
     dst = (struct in_addr *)addr_list[0];
 
     //Begin the trace!
-    trace(dst, 5);
+    //trace(dst, 5);
+    trace_hop(dst, 5, 3);
     return 0;
 }
 
