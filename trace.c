@@ -33,7 +33,16 @@ void *probe_thread(void *ip_info) {
 //This function will probe the individual hop and return the number of 
 //milliseconds it takes in order to receive the response from the hop
 int probe_hop(char ip_address[INET_ADDRSTRLEN], int ttl) {
-    printf("probing: %s with TTL: %d\n", ip_address, ttl);
+    struct hostent *host = gethostbyname(ip_address);
+    struct in_addr **addr_list;
+    struct in_addr *dst;
+    
+    addr_list = (struct in_addr **)host->h_addr_list;
+
+    dst = (struct in_addr *)addr_list[0];
+
+    trace_hop(dst, 5, 3);
+    //printf("probing: %s with TTL: %d\n", ip_address, ttl);
     return 0;
 }
 
@@ -44,12 +53,20 @@ int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
     int i, rc;
     ip_struct *addr_info;
 
+    //struct hostent *host = gethostbyname(ip_list[0]);
+
     for(i = 0;i < listsize-1; i++ ) {
-	strncpy(addr_info->ip_address, ip_list[i], INET_ADDRSTRLEN);
-	addr_info->ttl = i+1;
+        printf("list - %s - end\n", ip_list[i]);
+        
+        /*
+        if (is_empty(ip_list[i]))
+            continue;
+
+	    strncpy(addr_info->ip_address, ip_list[i], INET_ADDRSTRLEN);
+	    addr_info->ttl = i+1;
 	
-	rc = pthread_create(&threads[i], NULL, probe_thread, addr_info);
-	pthread_join(threads[i], NULL);
+	    rc = pthread_create(&threads[i], NULL, probe_thread, addr_info);
+	    pthread_join(threads[i], NULL);*/
 	    
     }
     //free(addr_info);
@@ -265,30 +282,32 @@ void trace(struct in_addr *dst, int send_cnt) {
 		continue;
 	    }
 	    if(he != NULL)
-		printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hops);
+		    printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hops);
 	    else
-		printf("Address: %s Hops: %d\n", ip4, hops);
+		    printf("Address: %s Hops: %d\n", ip4, hops);
 
             //Convert and compare the address of the destination with the address of the sender
             //if the sender == the destination than the process ends and the socket is closed.
             inet_ntop(AF_INET, &(addr.sin_addr), ip_compare, INET_ADDRSTRLEN);
             if(strcmp(ip4,ip_compare) == 0) {
-		strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
+		        strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
                 break;
             }
 
             //increment the TTL along with number of hops
             //(this represents the same thing, but was getting weird results when printing ttl)
             strncpy(oldip, ip4, sizeof(oldip));
-	    strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
-	    ttl++;
+	        strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
+	        
+            ttl++;
             hops++;
             continue;
         }
     }
     //starr_print(new_iparray, iparray, hops);
-    handle_hops(iparray, hops);
     close(sock);
+    handle_hops(iparray, hops);
+    //close(sock);
 }
 
 void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
@@ -403,10 +422,13 @@ void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
             inet_ntop(AF_INET, &(address.sin_addr), ip4, INET_ADDRSTRLEN);
             he = gethostbyaddr(&(address.sin_addr), sizeof(address.sin_addr), AF_INET);
 
-            if(he != NULL)
+            if(he != NULL) {
                 printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hopnum);
-            else
+                break;
+            } else {
                 printf("Address: %s Hops: %d\n", ip4, hops);
+                break;
+            }
 
         }
     }
@@ -436,8 +458,9 @@ int main(int argc, char *argv[]) {
     dst = (struct in_addr *)addr_list[0];
 
     //Begin the trace!
-    //trace(dst, 5);
-    trace_hop(dst, 5, 3);
+    trace(dst, 5);
+    //trace_hop(dst, 5, 3);
+    //probe_hop(argv[1], 3);
     return 0;
 }
 
