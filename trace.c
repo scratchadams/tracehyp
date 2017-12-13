@@ -25,9 +25,12 @@ typedef struct {
 
 void *probe_thread(void *ip_info) {
     ip_struct address_info = *((ip_struct*)(ip_info));
-
+    //address_info = malloc(sizeof(address_info));
+    
+    printf("made it further\n");
     if((strlen(address_info.ip_address)) > 3)
-	probe_hop(address_info.ip_address, address_info.ttl);
+        printf("here - %s\n", address_info.ip_address);
+	    probe_hop(address_info.ip_address, address_info.ttl);
 }
     
 //This function will probe the individual hop and return the number of 
@@ -52,21 +55,25 @@ int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
     pthread_t threads[ARRSIZE];
     int i, rc;
     ip_struct *addr_info;
+    addr_info = malloc(sizeof(addr_info));
 
     //struct hostent *host = gethostbyname(ip_list[0]);
 
     for(i = 0;i < listsize-1; i++ ) {
-        printf("list - %s - end\n", ip_list[i]);
+        printf("list - %s - size - %d\n", ip_list[i], strlen(ip_list[i]));
         
-        /*
-        if (is_empty(ip_list[i]))
+        
+        if (strlen(ip_list[i]) == 0)
             continue;
 
-	    strncpy(addr_info->ip_address, ip_list[i], INET_ADDRSTRLEN);
-	    addr_info->ttl = i+1;
+	    //addr_info->ip_address = ip_list[i];
+        strncpy(addr_info->ip_address, ip_list[i], strlen(ip_list[i]));
+        addr_info->ip_address[strlen(ip_list[i])] = '\0';
+        addr_info->ttl = i+1;
 	
+        printf("made it\n");
 	    rc = pthread_create(&threads[i], NULL, probe_thread, addr_info);
-	    pthread_join(threads[i], NULL);*/
+	    pthread_join(threads[i], NULL);
 	    
     }
     //free(addr_info);
