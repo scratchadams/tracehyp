@@ -27,9 +27,9 @@ void *probe_thread(void *ip_info) {
     ip_struct address_info = *((ip_struct*)(ip_info));
     //address_info = malloc(sizeof(address_info));
     
-    printf("made it further\n");
+    //printf("made it further\n");
     if((strlen(address_info.ip_address)) > 3)
-        printf("here - %s\n", address_info.ip_address);
+        //printf("here - %s\n", address_info.ip_address);
 	    probe_hop(address_info.ip_address, address_info.ttl);
 }
     
@@ -44,7 +44,7 @@ int probe_hop(char ip_address[INET_ADDRSTRLEN], int ttl) {
 
     dst = (struct in_addr *)addr_list[0];
 
-    trace_hop(dst, 5, 3);
+    trace_hop(dst, 5, ttl);
     //printf("probing: %s with TTL: %d\n", ip_address, ttl);
     return 0;
 }
@@ -56,22 +56,25 @@ int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
     int i, rc;
     ip_struct *addr_info;
     addr_info = malloc(sizeof(addr_info));
+    int hop = 1;
+
+    char *str = "8.8.8.8";
 
     //struct hostent *host = gethostbyname(ip_list[0]);
 
-    for(i = 0;i < listsize-1; i++ ) {
-        printf("list - %s - size - %d\n", ip_list[i], strlen(ip_list[i]));
-        
+    for(i = 0;i < listsize; i++ ) {
+        //printf("list - %s - size - %d\n", ip_list[i], strlen(ip_list[i]));
         
         if (strlen(ip_list[i]) == 0)
             continue;
 
 	    //addr_info->ip_address = ip_list[i];
-        strncpy(addr_info->ip_address, ip_list[i], strlen(ip_list[i]));
-        addr_info->ip_address[strlen(ip_list[i])] = '\0';
-        addr_info->ttl = i+1;
+        strncpy(addr_info->ip_address, str, strlen(ip_list[i]));
+        //addr_info->ip_address[strlen(str)] = '\0';
+        addr_info->ttl = hop;
+        hop++;
 	
-        printf("made it\n");
+        //printf("made it\n");
 	    rc = pthread_create(&threads[i], NULL, probe_thread, addr_info);
 	    pthread_join(threads[i], NULL);
 	    
@@ -259,8 +262,8 @@ void trace(struct in_addr *dst, int send_cnt) {
                            (struct sockaddr*)&address, &slen)) <= 0)
             {
                 if(count > 5) {
-		    strncpy(oldip, ip4, sizeof(oldip));
-		    //strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
+		            strncpy(oldip, ip4, sizeof(oldip));
+		            //strncpy(iparray[hops], ip4, sizeof(iparray[hops]));
                     count = 0;
                     ttl++;
                     hops++;
@@ -279,14 +282,15 @@ void trace(struct in_addr *dst, int send_cnt) {
             count = 0;
 
             struct hostent *he;
-	    //Convert the sender address information to a readable format then print
+	        
+            //Convert the sender address information to a readable format then print
             inet_ntop(AF_INET, &(address.sin_addr),ip4, INET_ADDRSTRLEN);
             he = gethostbyaddr(&(address.sin_addr), sizeof(address.sin_addr), AF_INET);
 	    
 	    if(strncmp(oldip, ip4, sizeof(oldip)) == 0) {
-		//printf("new ip: %s\n", ip4);
-		//printf("old ip: %s hops: %d\n", oldip, hops);
-		continue;
+		    //printf("new ip: %s\n", ip4);
+		    //printf("old ip: %s hops: %d\n", oldip, hops);
+		    continue;
 	    }
 	    if(he != NULL)
 		    printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hops);
