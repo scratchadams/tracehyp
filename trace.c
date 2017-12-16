@@ -51,7 +51,7 @@ int probe_hop(char ip_address[INET_ADDRSTRLEN], int ttl) {
 
 //This function will handle the creation of new threads in order to gather
 //information from each individual hop, as well as the
-int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
+int handle_hops(char *ip_add, int hopcount) {
     pthread_t threads[ARRSIZE];
     int i, rc;
     ip_struct *addr_info;
@@ -62,14 +62,14 @@ int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
 
     //struct hostent *host = gethostbyname(ip_list[0]);
 
-    for(i = 0;i < listsize; i++ ) {
+    for(i = 0;i < hopcount; i++ ) {
         //printf("list - %s - size - %d\n", ip_list[i], strlen(ip_list[i]));
         
-        if (strlen(ip_list[i]) == 0)
-            continue;
+        //if (strlen(ip_list[i]) == 0)
+        //    continue;
 
 	    //addr_info->ip_address = ip_list[i];
-        strncpy(addr_info->ip_address, str, strlen(ip_list[i]));
+        strncpy(addr_info->ip_address, ip_add, strlen(ip_add));
         //addr_info->ip_address[strlen(str)] = '\0';
         addr_info->ttl = hop;
         hop++;
@@ -77,6 +77,7 @@ int handle_hops(char ip_list[ARRSIZE][INET_ADDRSTRLEN], int listsize) {
         //printf("made it\n");
 	    rc = pthread_create(&threads[i], NULL, probe_thread, addr_info);
 	    pthread_join(threads[i], NULL);
+        //int test = probe_hop("8.8.8.8", hop);
 	    
     }
     //free(addr_info);
@@ -183,6 +184,8 @@ void trace(struct in_addr *dst, int send_cnt) {
     icmp_hdr.checksum = 0;
     icmp_hdr.un.echo.id = 1189;
 
+    char ip_compare[INET_ADDRSTRLEN];
+
     for (;;) {
         //printf("Start loop\n");
         //usleep(120000);
@@ -213,7 +216,7 @@ void trace(struct in_addr *dst, int send_cnt) {
         //Ip address structure and variables
         struct sockaddr_in address;
         char ip4[INET_ADDRSTRLEN];
-        char ip_compare[INET_ADDRSTRLEN];
+        //char ip_compare[INET_ADDRSTRLEN];
 
         //copy the ICMP header information into data char array
         //then copy the "hello" data into the data char array in the position following the header
@@ -317,7 +320,7 @@ void trace(struct in_addr *dst, int send_cnt) {
     }
     //starr_print(new_iparray, iparray, hops);
     close(sock);
-    handle_hops(iparray, hops);
+    handle_hops(ip_compare, hops);
     //close(sock);
 }
 
@@ -360,7 +363,9 @@ void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
 	icmp_hdr.checksum = 0;
 	icmp_hdr.un.echo.id = 1191; //make this random
 
-	for (;;) {
+	char ip_compare[INET_ADDRSTRLEN];
+    
+    for (;;) {
 
         if((setsockopt(sock, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl))) < 0) {
 		    perror("setsockopt");
@@ -378,7 +383,7 @@ void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
 
 	    struct sockaddr_in address;
 	    char ip4[INET_ADDRSTRLEN];
-	    char ip_compare[INET_ADDRSTRLEN];
+	    //char ip_compare[INET_ADDRSTRLEN];
 
 	    memcpy(data, &icmp_hdr, sizeof(icmp_hdr));
 	    memcpy(data + sizeof(icmp_hdr), "hello", 5);
