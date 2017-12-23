@@ -12,16 +12,38 @@
 #include <sys/select.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <ncurses.h>
 
 #define ARRSIZE 100
 
 //to allow root to use icmp run:
 //sysctl -w net.ipv4.ping_group_range="0 0"
 
+WINDOW *create_newwin(int height, int width, int starty, int startx);
+void destroy_win(WINDOW *local_win);
+
 typedef struct {
     char ip_address[INET_ADDRSTRLEN];
     int ttl;
 } ip_struct;
+
+WINDOW *create_newwin(int height, int width, int starty, int startx) {
+    WINDOW *local_win;
+
+    local_win = newwin(height, width, starty, startx);
+    box(local_win, 0, 0);
+
+    wrefresh(local_win);
+    return local_win;
+}
+
+void destroy_win(WINDOW *local_win) {
+    wborder(local_win, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ');
+    wrefresh(local_win);
+    delwin(local_win);
+}
+
+static WINDOW *trace_win;
 
 void *probe_thread(void *ip_info) {
     ip_struct address_info = *((ip_struct*)(ip_info));
@@ -29,8 +51,9 @@ void *probe_thread(void *ip_info) {
     
     //printf("made it further\n");
     if((strlen(address_info.ip_address)) > 3)
-        //printf("here - %s\n", address_info.ip_address);
-	    probe_hop(address_info.ip_address, address_info.ttl);
+        wprintw(stdscr, "here - %s\n", address_info.ip_address);
+	    refresh();
+        probe_hop(address_info.ip_address, address_info.ttl);
 }
     
 //This function will probe the individual hop and return the number of 
@@ -39,11 +62,10 @@ int probe_hop(char ip_address[INET_ADDRSTRLEN], int ttl) {
     struct hostent *host = gethostbyname(ip_address);
     struct in_addr **addr_list;
     struct in_addr *dst;
-    
+
     addr_list = (struct in_addr **)host->h_addr_list;
 
     dst = (struct in_addr *)addr_list[0];
-
     trace_hop(dst, 5, ttl);
     //printf("probing: %s with TTL: %d\n", ip_address, ttl);
     return 0;
@@ -60,6 +82,8 @@ int handle_hops(char *ip_add, int hopcount) {
 
     char *str = "8.8.8.8";
 
+    initscr();
+    //trace_win = create_newwin(100, 150, 0, 0);
     //struct hostent *host = gethostbyname(ip_list[0]);
 
     for(i = 0;i < hopcount; i++ ) {
@@ -70,7 +94,7 @@ int handle_hops(char *ip_add, int hopcount) {
 
 	    //addr_info->ip_address = ip_list[i];
         strncpy(addr_info->ip_address, ip_add, strlen(ip_add));
-        //addr_info->ip_address[strlen(str)] = '\0';
+        addr_info->ip_address[strlen(ip_add)] = '\0';
         addr_info->ttl = hop;
         hop++;
 	
@@ -80,6 +104,9 @@ int handle_hops(char *ip_add, int hopcount) {
         //int test = probe_hop("8.8.8.8", hop);
 	    
     }
+    getch();
+    //destroy_win(trace_win);
+    endwin();
     //free(addr_info);
 
     return 0;
@@ -131,7 +158,7 @@ int starr_print(char *newarray[], char strarray[ARRSIZE][INET_ADDRSTRLEN], int a
 //This function does all the heavy lifting
 //It takes the argument dst which is a structure containing the
 //destination information, and performs a traceroute against it.
-void trace(struct in_addr *dst, int send_cnt) {
+void init_trace(struct in_addr *dst, int send_cnt) {
     //define structures for header and address information
     struct icmphdr icmp_hdr;
     struct sockaddr_in addr;
@@ -341,6 +368,7 @@ void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
 	int count, sequence = 0;
 	int on, hops = 1;
     int ttl = hopnum;
+    int y, x;
 
 	fd_set read_set;
 	socklen_t slen;
@@ -408,7 +436,10 @@ void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
         ch = select(sock+1, &read_set, NULL, NULL, &timeout);
 
         if(ch == 0) {
-            printf("timeout\n");
+            getyx(stdscr, y, x);
+            wprintw(stdscr, "y: %d and x: %d\n", y, x);
+            wprintw(stdscr, "timeout\n");
+            refresh();
             break;
 
         } else if (ch < 0) {
@@ -439,10 +470,16 @@ void trace_hop(struct in_addr *dst, int send_cnt, int hopnum) {
             he = gethostbyaddr(&(address.sin_addr), sizeof(address.sin_addr), AF_INET);
 
             if(he != NULL) {
-                printf("Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hopnum);
+                getyx(stdscr, y, x);
+                wprintw(stdscr, "y: %d and x: %d\n", y, x);
+                wprintw(stdscr, "Host: %s Address: %s Hops: %d\n", he->h_name, ip4, hopnum);
+                refresh();
                 break;
             } else {
-                printf("Address: %s Hops: %d\n", ip4, hops);
+                getyx(stdscr, y, x);
+                wprintw(stdscr, "y: %d and x: %d\n", y, x);
+                wprintw(stdscr, "Address: %s Hops: %d\n", ip4, hopnum);
+                refresh();
                 break;
             }
 
@@ -474,7 +511,7 @@ int main(int argc, char *argv[]) {
     dst = (struct in_addr *)addr_list[0];
 
     //Begin the trace!
-    trace(dst, 5);
+    init_trace(dst, 5);
     //trace_hop(dst, 5, 3);
     //probe_hop(argv[1], 3);
     return 0;
